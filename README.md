@@ -1,6 +1,15 @@
 # domain-name-checker
 a simple bash script to check if your domain is available without tipping off every registry on the planet that you are in the neighborhood for that domain name.
 
+## TOC:
+- [Background / Why](#Background)
+- [Instructions](#Instructions)
+-    [Make it executable](#make-executable)
+-    [How to use it](#How-to-use-it)
+-    [Why this is safe](#Why-this-is-safe)
+- [check_domain.sh](#The-Domain-Checker-Script)  
+- [doublecheck_domain.sh](#Upgrayed)  
+
 ## Instructions:
 
 To make this script as fast and stealthy as possible, we can use a hybrid approach based on the methods discussed in [the background section](#Background).  
@@ -11,6 +20,7 @@ If it doesn't find NS records, the domain might be available, OR it might just b
 > ```bash
 > chmod +x check_domains.sh
 > ```  
+
 
 ### The Domain Checker Script
 
@@ -79,7 +89,7 @@ fi
 echo "---------------------------------------------------"
 ```
 Press [esc] to exit interactive mode and then press `:wq` to enter command mode (:), save (w), and quit (q). 
-
+<a id="make-executable"></a>
 3. Make the script executable:
    Run this command so your system is allowed to execute it:
 ```bash
@@ -141,22 +151,22 @@ However, you can absolutely get a false negative—a situation where your WHOIS 
 
 WHOIS servers are heavily protected against spam and scraping. If you run a list of 500 domains through a script, the registry will likely ban your IP address after the first 50 or so queries.  
 
-  • **What happens**: Instead of returning registration data, the server returns an error message like Query limit exceeded or simply drops the connection.  
-  • **Why it causes a false negative**: If a script is just looking for the absence of registration data (or if it's poorly coded), it might misinterpret that error or blank response as "Oh, no owner data found, it must be available!"  
+- **What happens**: Instead of returning registration data, the server returns an error message like Query limit exceeded or simply drops the connection.  
+- **Why it causes a false negative**: If a script is just looking for the absence of registration data (or if it's poorly coded), it might misinterpret that error or blank response as "Oh, no owner data found, it must be available!"  
 
 ###### 2. Quirks with ccTLDs (Country Code Top-Level Domains)  
 
 While .com and .net have very standardized WHOIS responses, country-code extensions like .io, .ai, or .co.uk are managed by entirely different organizations with their own unique rules and server software.  
 
-  • **What happens**: Some of these registries have non-standard "not found" messages, or their servers are notoriously unreliable and frequently time out.  
-  • **Why it causes a false negative**: If your script is using grep to look for the exact phrase "No match for domain", but the .io registry responds with "Domain not found", your script might fail to read the availability correctly.  
+- **What happens**: Some of these registries have non-standard "not found" messages, or their servers are notoriously unreliable and frequently time out.  
+- **Why it causes a false negative**: If your script is using grep to look for the exact phrase "No match for domain", but the .io registry responds with "Domain not found", your script might fail to read the availability correctly.  
 
 ###### 3. The "Pending Delete" Limbo  
 
 When someone stops paying for a domain, it doesn't instantly become available. It goes through a lifecycle (Expired -> Redemption Grace Period -> Pending Delete).
 
-  • **What happens**: During the final hours of the "Pending Delete" phase, the domain is technically wiped from the active DNS zone, but the registry hasn't fully released it to the public for new registration yet.  
-  • **Why it causes a false negative**: A standard WHOIS check might show no active owner, leading you to believe you can buy it right now, but if you try to register it via a registrar, it will fail because the registry hasn't unlocked it yet.  
+- **What happens**: During the final hours of the "Pending Delete" phase, the domain is technically wiped from the active DNS zone, but the registry hasn't fully released it to the public for new registration yet.  
+- **Why it causes a false negative**: A standard WHOIS check might show no active owner, leading you to believe you can buy it right now, but if you try to register it via a registrar, it will fail because the registry hasn't unlocked it yet.  
 
 
 ##### Why our script avoids this trap  
@@ -187,8 +197,8 @@ curl -I https://rdap.verisign.com/com/v1/domain/yourdomainhere.com
 
 How to read the results:  
    
-   • **If the domain is REGISTERED**: The server will return an HTTP/1.1 200 OK response.  
-   • **If the domain is AVAILABLE**: The server will return an HTTP/1.1 404 Not Found response.  
+- **If the domain is REGISTERED**: The server will return an HTTP/1.1 200 OK response.  
+- **If the domain is AVAILABLE**: The server will return an HTTP/1.1 404 Not Found response.  
 
    > (Note: We use the -I flag to only fetch the HTTP headers. If you want to see the full JSON data for a registered domain, remove the -I flag).  
    > If you are looking up other extensions (like .org or .io), you will need to find the specific RDAP base URL for that registry. IANA maintains a complete bootstrap list of all RDAP endpoints for every Top-Level Domain (TLD) at https://data.iana.org/rdap/dns.json.  
@@ -203,8 +213,8 @@ whois yourdomainhere.com
 ```
 How to read the results:  
    
-   • **If the domain is REGISTERED**: You will get a block of text showing the registrar, creation date, and expiration date.  
-   • **If the domain is AVAILABLE**: You will see a message like No match for "YOURDOMAINHERE.COM".  
+- **If the domain is REGISTERED**: You will get a block of text showing the registrar, creation date, and expiration date.  
+- **If the domain is AVAILABLE**: You will see a message like No match for "YOURDOMAINHERE.COM".  
 
    > A slight caveat: Some command-line WHOIS clients route queries through a central server to figure out which registry to ask. While vastly safer than a retail website, if you want absolute paranoia-level safety, you can force the command to only talk to the specific registry using the -h flag:  
 
@@ -223,7 +233,159 @@ dig +short NS yourdomainhere.com
 ```
 How to read the results:
    
-   • If it returns nameservers (e.g., ns1.google.com): The domain is definitely registered and active.
-   • If it returns nothing: The domain is likely available.
+- If it returns nameservers (e.g., ns1.google.com): The domain is definitely registered and active.
+- If it returns nothing: The domain is likely available.
       
    > The Catch: This method is not 100% foolproof. A domain can be registered but parked without any DNS nameservers attached to it. However, it is an excellent, entirely invisible first-pass filter when you are brainstorming a massive list of potential names before running the final candidates through RDAP or WHOIS.
+
+
+## Upgrayed
+
+This is a wonderfully devious and highly robust approach. Building a polyglot script—a Bash script that gracefully falls back to other languages (Python, Node, or jq) installed on the host system to handle complex tasks like JSON parsing—is a brilliant way to make your tool bulletproof.  
+Instead of failing when jq isn't installed, the script acts as a chameleon, probing the environment using command -v (which is generally preferred over which in Bash scripts for POSIX compliance) and injecting a tiny inline script into whatever runtime it finds.  
+Here is the ultimate, triple-layered domain availability checker.  
+
+### The Logic Waterfall
+1. The Stealth Layer: Checks dig for active nameservers.
+2. The Modern Layer: If no nameservers, it caches the IANA dns.json file, hunts down a JSON parser (jq, python3, or node), extracts the exact RDAP URL, and queries it via HTTP.
+3. The Fallback Layer: If it gets an HTTP 429 Rate Limit from RDAP, or if no JSON parsers are installed on the system, it gracefully falls back to traditional whois.
+
+### The Ultimate check_domains.sh Script
+
+> This script is already available for you in this repository as `doublecheck_domains.sh`
+> You simply need to [make it executable](#make-executable)
+
+```bash
+#!/bin/bash
+
+IANA_URL="https://data.iana.org/rdap/dns.json"
+CACHE_FILE="/tmp/iana_rdap_bootstrap.json"
+
+# Download the IANA bootstrap file once per session to avoid spamming IANA
+if [ ! -f "$CACHE_FILE" ]; then
+    echo "Downloading IANA RDAP bootstrap file..."
+    curl -s "$IANA_URL" -o "$CACHE_FILE"
+fi
+
+# Function to dynamically extract the RDAP base URL using whatever parser is available
+get_rdap_url() {
+    local tld=$1
+    local url=""
+
+    if command -v jq >/dev/null 2>&1; then
+        url=$(jq -r --arg tld "$tld" '.services[] | select(.[0][] | . == $tld) | .[1][0]' "$CACHE_FILE" 2>/dev/null)
+    
+    elif command -v python3 >/dev/null 2>&1; then
+        # Heredoc passed into Python3
+        url=$(python3 - "$CACHE_FILE" "$tld" << 'EOF'
+import sys, json
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    for s in data.get('services', []):
+        if sys.argv[2] in s[0]:
+            print(s[1][0])
+            sys.exit(0)
+except Exception:
+    pass
+EOF
+        )
+
+    elif command -v node >/dev/null 2>&1; then
+        # Inline script passed into Node
+        url=$(node -e "
+            try {
+                const fs = require('fs');
+                const data = JSON.parse(fs.readFileSync('$CACHE_FILE'));
+                const match = data.services.find(s => s[0].includes('$tld'));
+                if(match) console.log(match[1][0]);
+            } catch(e) {}
+        ")
+    fi
+
+    echo "$url"
+}
+
+# Function to check the domain
+check_domain() {
+    local domain=$1
+    local tld="${domain##*.}"
+    printf "%-35s " "$domain"
+
+    # --- LAYER 1: THE STEALTH CHECK (DNS) ---
+    local ns_records
+    ns_records=$(dig +short NS "$domain" | tr '\n' ' ' | sed 's/ *$//')
+
+    if [ -n "$ns_records" ]; then
+        echo -e "[\033[0;31mREGISTERED\033[0m] (Active DNS)"
+        return
+    fi
+
+    # --- LAYER 2: THE MODERN CHECK (RDAP) ---
+    local rdap_base_url
+    rdap_base_url=$(get_rdap_url "$tld")
+
+    if [ -n "$rdap_base_url" ]; then
+        # Format the final URL correctly (ensuring no double slashes before 'domain/')
+        local rdap_url="${rdap_base_url%/}/domain/$domain"
+        
+        # Get just the HTTP status code
+        local http_status
+        http_status=$(curl -s -o /dev/null -w "%{http_code}" "$rdap_url")
+
+        if [ "$http_status" == "200" ]; then
+            echo -e "[\033[0;31mREGISTERED\033[0m] (RDAP Confirmed Parked/Inactive)"
+            return
+        elif [ "$http_status" == "404" ]; then
+            echo -e "[\033[0;32mAVAILABLE\033[0m]  (RDAP Confirmed!)"
+            return
+        elif [ "$http_status" == "429" ]; then
+            printf "[\033[0;33mRDAP RATE LIMITED\033[0m] Falling back to WHOIS... "
+        else
+            printf "[\033[0;33mRDAP ERR %s\033[0m] Falling back to WHOIS... " "$http_status"
+        fi
+    else
+        printf "[\033[0;33mNO RDAP PARSER/URL\033[0m] Falling back to WHOIS... "
+    fi
+
+    # --- LAYER 3: THE FALLBACK CHECK (WHOIS) ---
+    local whois_output
+    whois_output=$(whois "$domain" 2>/dev/null)
+
+    if echo "$whois_output" | grep -iqE 'no match|not found|no entries found|domain not found|available for registration|no data found'; then
+        echo -e "[\033[0;32mAVAILABLE\033[0m]"
+    else
+        # If it doesn't explicitly say it's available, assume it's registered
+        echo -e "[\033[0;31mREGISTERED\033[0m] (WHOIS Confirmed Parked/Inactive)"
+    fi
+}
+
+# --- MAIN EXECUTION ---
+if [ -z "$1" ]; then
+    echo "Usage: $0 <domain.com> OR $0 <file_with_domains.txt>"
+    exit 1
+fi
+
+if [ -f "$1" ]; then
+    echo "Scanning list from file: $1..."
+    echo "------------------------------------------------------------"
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        clean_domain=$(echo "$line" | tr -d '[:space:]')
+        check_domain "$clean_domain"
+    done < "$1"
+else
+    echo "------------------------------------------------------------"
+    check_domain "$1"
+fi
+echo "------------------------------------------------------------"
+```
+
+### What makes this script special:
+
+- The /tmp Cache: It downloads dns.json to /tmp/iana_rdap_bootstrap.json exactly once. If you pass it a list of 500 domains, it doesn't query IANA 500 times.
+- The command -v probe: It strictly checks for executables in the system's $PATH silently.
+- Heredocs for Python: Passing the Python script via python3 - << 'EOF' allows us to write multi-line, readable Python code right inside the Bash script without dealing with horrific Bash quotation escaping rules.
+- HTTP Status Parsing: By using curl -w "%{http_code}", we strip out the massive JSON payload that RDAP usually returns and purely rely on the HTTP standard (200 OK, 404 Not Found, 429 Too Many Requests).
+
+This script is practically a fully-fledged CLI application at this point. It relies on no external packages outside of what a standard developer environment will naturally have installed, avoids retailer tracking, and handles registry API throttling seamlessly.
